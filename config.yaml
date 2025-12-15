@@ -1,0 +1,72 @@
+# Market AI Configuration
+
+# Data Settings
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  start_date: "2017-01-01"
+  end_date: null  # null = today
+  
+# Universe Settings
+universe:
+  method: "fixed_list"  # Options: fixed_list, sp500, top_volume
+  size: 200  # Number of stocks to track
+  min_market_cap: 1_000_000_000  # 1B minimum
+  
+# Feature Engineering
+features:
+  return_windows: [1, 5, 10, 20, 60]
+  volatility_windows: [5, 10, 20]
+  volume_windows: [20]
+  ma_windows: [5, 20, 60]
+  
+# Model Settings
+model:
+  type: "lightgbm"  # Options: lightgbm, xgboost
+  horizons: [1, 5]  # Prediction horizons in days
+  
+  # LightGBM parameters
+  lgbm_params:
+    objective: "regression"
+    metric: "rmse"
+    boosting_type: "gbdt"
+    num_leaves: 31
+    learning_rate: 0.05
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    max_depth: -1
+    min_data_in_leaf: 20
+    verbose: -1
+    
+  # Training
+  n_estimators: 500
+  early_stopping_rounds: 50
+  
+# Backtest Settings
+backtest:
+  split_method: "walk_forward"
+  train_years: 5
+  test_years: 1
+  
+  # Costs
+  commission: 0.0005  # 0.05% per trade
+  slippage: 0.0002    # 0.02% slippage
+  
+  # Portfolio
+  max_positions: 5
+  rebalance_freq: "daily"  # daily or weekly
+  min_weight: 0.05
+  max_weight: 0.40
+  
+# Risk Settings
+risk:
+  vol_lookback: 20
+  vol_target: 0.15  # Annual vol target
+  max_leverage: 1.0
+  
+# Recommendation Engine
+recommend:
+  scoring_method: "sharpe"  # Options: sharpe, prob_target, expected_return
+  min_prob_profit: 0.52  # Minimum probability to recommend
+  top_n: 5  # Number of recommendations to show
