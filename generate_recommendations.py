@@ -31,12 +31,18 @@ def format_recommendations(result):
     output.append("\n📈 PORTFOLIO METRICS:")
     output.append("-"*60)
     metrics = result['portfolio_metrics']
-    output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
-    output.append(f"  Success Probability: {metrics['probability_profit']:.1%}")
-    output.append(f"  Expected Return: {metrics['expected_return']:+.2%}")
-    output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
-    output.append(f"  Sharpe Ratio: {metrics['sharpe_estimate']:.2f}")
-    output.append(f"  Portfolio Risk: {metrics['portfolio_risk']:.2%}")
+    
+    # Calculate expected profit if not present
+    expected_return = metrics.get('expected_return', 0)
+    capital = result['inputs']['capital']
+    expected_profit = metrics.get('expected_profit', capital * expected_return)
+    
+    output.append(f"  Capital: ${capital:,.2f}")
+    output.append(f"  Success Probability: {metrics.get('probability_profit', 0.5):.1%}")
+    output.append(f"  Expected Return: {expected_return:+.2%}")
+    output.append(f"  Expected Profit: ${expected_profit:+,.2f}")
+    output.append(f"  Sharpe Ratio: {metrics.get('sharpe_estimate', 0):.2f}")
+    output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0):.2%}")
     
     # Recommendations
     output.append("\n🎯 TOP RECOMMENDATIONS:")
@@ -55,7 +61,10 @@ def format_recommendations(result):
             output.append(f"   Investment: ${rec['allocation']:,.2f} ({rec['weight']:.1%} of portfolio)")
             output.append(f"   Expected Return: {rec['expected_return']:+.2%}")
             output.append(f"   Risk Level: {rec['risk_score']:.2f}")
-            output.append(f"   Confidence: {rec.get('prediction_confidence', 0.5):.1%}")
+            
+            # Add confidence if available
+            if 'prediction_confidence' in rec:
+                output.append(f"   Confidence: {rec['prediction_confidence']:.1%}")
     
     # Risk warning
     output.append("\n")
@@ -85,16 +94,34 @@ def main():
     """Generate and save recommendations"""
     
     print("Initializing recommendation engine...")
-    engine = EnhancedRecommendationEngine()
+    
+    try:
+        engine = EnhancedRecommendationEngine()
+    except Exception as e:
+        print(f"Error initializing engine: {e}")
+        # Create empty recommendations file
+        with open('recommendations.txt', 'w') as f:
+            f.write("❌ Could not initialize recommendation engine.\n")
+            f.write(f"Error: {str(e)}\n")
+        return 1
     
     print("Generating recommendations...")
-    result = engine.recommend(
-        capital=10000,
-        horizon='1w',
-        risk_level='medium',
-        goal='max_sharpe',
-        num_positions=5
-    )
+    
+    try:
+        result = engine.recommend(
+            capital=10000,
+            horizon='1w',
+            risk_level='medium',
+            goal='max_sharpe',
+            num_positions=5
+        )
+    except Exception as e:
+        print(f"Error generating recommendations: {e}")
+        # Create error file
+        with open('recommendations.txt', 'w') as f:
+            f.write("❌ Could not generate recommendations.\n")
+            f.write(f"Error: {str(e)}\n")
+        return 1
     
     print("Formatting output...")
     formatted = format_recommendations(result)
