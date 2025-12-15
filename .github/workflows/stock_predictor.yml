@@ -1,0 +1,151 @@
+name: Stock Market Predictor Automation
+
+on:
+  schedule:
+    # Morning: 8:30 AM ET = 1:30 PM UTC (Monday-Friday)
+    - cron: '30 13 * * 1-5'
+    # Evening: 5:00 PM ET = 10:00 PM UTC (Monday-Friday)  
+    - cron: '0 22 * * 1-5'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  morning-analysis:
+    # Only run morning job at 8:30 AM or manual trigger
+    if: github.event.schedule == '30 13 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download previous data (if exists)
+      uses: actions/download-artifact@v3
+      with:
+        name: market-data
+        path: .
+      continue-on-error: true
+    
+    - name: Run data update and model training
+      run: |
+        echo "Starting morning analysis..."
+        python main.py
+        echo "Morning analysis complete!"
+    
+    - name: Generate recommendations
+      id: recommend
+      run: |
+        echo "Generating recommendations..."
+        python generate_recommendations.py
+        echo "Recommendations generated!"
+    
+    - name: Upload recommendations artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: recommendations
+        path: recommendations.txt
+        retention-days: 7
+    
+    - name: Save data for next run
+      uses: actions/upload-artifact@v3
+      with:
+        name: market-data
+        path: |
+          data/raw/prices.parquet
+          data/processed/features.parquet
+          models/
+          data/performance/
+        retention-days: 30
+    
+    - name: Send email with recommendations
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: 📊 Stock Recommendations - ${{ github.event.repository.updated_at }}
+        to: ${{ secrets.EMAIL_TO }}
+        from: Stock Predictor Bot
+        body: file://recommendations.txt
+        priority: high
+
+  evening-tracking:
+    # Only run evening job at 5:00 PM
+    if: github.event.schedule == '0 22 * * 1-5'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download previous data
+      uses: actions/download-artifact@v3
+      with:
+        name: market-data
+        path: .
+      continue-on-error: true
+    
+    - name: Update performance tracker
+      run: |
+        echo "Updating performance tracker..."
+        python track_performance.py --update
+        python track_performance.py --days 7 > performance_report.txt
+        echo "Performance update complete!"
+    
+    - name: Send performance report email
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: 📈 Performance Report - Week Summary
+        to: ${{ secrets.EMAIL_TO }}
+        from: Stock Predictor Bot
+        body: file://performance_report.txt
+    
+    - name: Save updated data
+      uses: actions/upload-artifact@v3
+      with:
+        name: market-data
+        path: |
+          data/raw/prices.parquet
+          data/processed/features.parquet
+          data/performance/
+        retention-days: 30
