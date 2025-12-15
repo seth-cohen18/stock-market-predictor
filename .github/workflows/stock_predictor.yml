@@ -12,7 +12,6 @@ on:
 
 jobs:
   morning-analysis:
-    # Only run morning job at 8:30 AM or manual trigger
     if: github.event.schedule == '30 13 * * 1-5' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
@@ -39,7 +38,7 @@ jobs:
         pip install -r requirements.txt
     
     - name: Download previous data (if exists)
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: market-data
         path: .
@@ -59,14 +58,14 @@ jobs:
         echo "Recommendations generated!"
     
     - name: Upload recommendations artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: recommendations
         path: recommendations.txt
         retention-days: 7
     
     - name: Save data for next run
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: market-data
         path: |
@@ -90,7 +89,6 @@ jobs:
         priority: high
 
   evening-tracking:
-    # Only run evening job at 5:00 PM
     if: github.event.schedule == '0 22 * * 1-5'
     runs-on: ubuntu-latest
     
@@ -115,7 +113,7 @@ jobs:
         pip install -r requirements.txt
     
     - name: Download previous data
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: market-data
         path: .
@@ -141,7 +139,7 @@ jobs:
         body: file://performance_report.txt
     
     - name: Save updated data
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: market-data
         path: |
