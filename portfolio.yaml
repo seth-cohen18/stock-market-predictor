@@ -1,0 +1,34 @@
+# Portfolio Configuration
+# Update this file with your holdings
+
+# Available cash for new investments
+cash: 0.00
+
+# Your current holdings
+# Format:
+#   TICKER:
+#     shares: number of shares you own
+#     avg_cost: average price you paid per share
+
+holdings:
+  AAPL:
+    shares: 18
+    avg_cost: 180.00  # Update this to your actual average cost
+  
+  MMM:  # 3M Company
+    shares: 29
+    avg_cost: 95.00  # Update this to your actual average cost
+
+# Risk preferences
+risk_profile:
+  max_position_size: 0.20  # Max 20% of portfolio in one stock
+  min_position_size: 0.05  # Min 5% for new positions
+  target_positions: 8  # Aim for 8-10 stocks total
+  max_sector_exposure: 0.30  # Max 30% in one sector
+
+# Trading preferences
+preferences:
+  min_confidence: 0.65  # Only recommend if 65%+ confidence
+  rebalance_threshold: 0.10  # Rebalance if position drifts 10%+
+  take_profit_threshold: 0.25  # Consider selling at 25%+ gain
+  stop_loss_threshold: -0.15  # Alert if down 15%+

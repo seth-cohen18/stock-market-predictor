@@ -71,29 +71,38 @@ def run_data_pipeline(config):
 
 
 def run_model_training(config, df_features):
-    """Train models for all horizons"""
+    """Train models for all horizons with daily adaptive retraining"""
     print("\n" + "="*60)
-    print("STEP 2: Model Training")
+    print("STEP 2: Model Training (Daily Adaptive Retraining)")
     print("="*60)
+    
+    # Import adaptive trainer
+    from adaptive_trainer import AdaptiveTrainer
     
     feature_cols = get_feature_columns(df_features)
     print(f"Number of features: {len(feature_cols)}")
+    
+    # Initialize adaptive trainer (tracks improvement over time)
+    trainer = AdaptiveTrainer()
     
     results = {}
     for horizon in config['model']['horizons']:
         print(f"\n2.{horizon} Training {horizon}-day model...")
         
-        result = train_horizon_model(
-            df=df_features,
-            horizon=horizon,
-            config=config,
+        model_path = f'models/model_{horizon}d.txt'
+        
+        # Use adaptive training (proves daily learning)
+        training_metrics = trainer.train_with_latest_data(
+            df_features=df_features,
             feature_cols=feature_cols,
-            output_dir='models'
+            horizon=horizon,
+            model_path=model_path
         )
         
-        results[f'{horizon}d'] = result
+        results[f'{horizon}d'] = training_metrics
     
     return results
+
 
 
 def run_full_pipeline(config_path='config.yaml'):

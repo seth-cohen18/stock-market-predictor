@@ -22,7 +22,7 @@ def format_recommendations(result):
     output.append(f"Date: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}")
     output.append("="*60)
     
-    if not result.get('success', False):
+    if not result['success']:
         output.append("\n❌ ERROR: Could not generate recommendations")
         output.append(f"Reason: {result.get('error', 'Unknown error')}")
         return "\n".join(output)
@@ -30,51 +30,32 @@ def format_recommendations(result):
     # Portfolio metrics
     output.append("\n📈 PORTFOLIO METRICS:")
     output.append("-"*60)
-    metrics = result.get('portfolio_metrics', {})
-    inputs = result.get('inputs', {})
-    
-    # Safe access to all metrics
-    capital = inputs.get('capital', 10000)
-    expected_return = metrics.get('expected_return', 0)
-    expected_profit = metrics.get('expected_profit', capital * expected_return)
-    
-    output.append(f"  Capital: ${capital:,.2f}")
-    output.append(f"  Success Probability: {metrics.get('probability_profit', 0.5):.1%}")
-    output.append(f"  Expected Return: {expected_return:+.2%}")
-    output.append(f"  Expected Profit: ${expected_profit:+,.2f}")
-    output.append(f"  Sharpe Ratio: {metrics.get('sharpe_estimate', 0):.2f}")
-    output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0):.2%}")
+    metrics = result['portfolio_metrics']
+    output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
+    output.append(f"  Success Probability: {metrics['probability_profit']:.1%}")
+    output.append(f"  Expected Return: {metrics['expected_return']:+.2%}")
+    output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
+    output.append(f"  Sharpe Ratio: {metrics['sharpe_estimate']:.2f}")
+    output.append(f"  Portfolio Risk: {metrics['portfolio_risk']:.2%}")
     
     # Recommendations
     output.append("\n🎯 TOP RECOMMENDATIONS:")
     output.append("-"*60)
     
-    recommendations = result.get('recommendations', [])
+    recommendations = result['recommendations']
     
     if len(recommendations) == 0:
         output.append("\n⚠️  No recommendations today.")
         output.append("Market conditions may be unfavorable or all stocks below confidence threshold.")
     else:
         for i, rec in enumerate(recommendations, 1):
-            ticker = rec.get('ticker', 'N/A')
-            company = rec.get('company', 'Unknown')
-            price = rec.get('current_price', 0)
-            shares = rec.get('shares', 0)
-            allocation = rec.get('allocation', 0)
-            weight = rec.get('weight', 0)
-            exp_return = rec.get('expected_return', 0)
-            risk = rec.get('risk_score', 0)
-            
-            output.append(f"\n{i}. {ticker} - {company}")
-            output.append(f"   Price: ${price:.2f}")
-            output.append(f"   Shares: {shares:.2f}")
-            output.append(f"   Investment: ${allocation:,.2f} ({weight:.1%} of portfolio)")
-            output.append(f"   Expected Return: {exp_return:+.2%}")
-            output.append(f"   Risk Level: {risk:.2f}")
-            
-            # Add confidence if available
-            if 'prediction_confidence' in rec:
-                output.append(f"   Confidence: {rec['prediction_confidence']:.1%}")
+            output.append(f"\n{i}. {rec['ticker']} - {rec['company']}")
+            output.append(f"   Price: ${rec['current_price']:.2f}")
+            output.append(f"   Shares: {rec['shares']:.2f}")
+            output.append(f"   Investment: ${rec['allocation']:,.2f} ({rec['weight']:.1%} of portfolio)")
+            output.append(f"   Expected Return: {rec['expected_return']:+.2%}")
+            output.append(f"   Risk Level: {rec['risk_score']:.2f}")
+            output.append(f"   Confidence: {rec.get('prediction_confidence', 0.5):.1%}")
     
     # Risk warning
     output.append("\n")
@@ -90,12 +71,10 @@ def format_recommendations(result):
     output.append("="*60)
     output.append("ℹ️  MODEL INFO")
     output.append("="*60)
-    output.append(f"Horizon: {inputs.get('horizon', '1w')}")
-    output.append(f"Risk Level: {inputs.get('risk_level', 'medium')}")
-    output.append(f"Strategy: {inputs.get('goal', 'max_sharpe')}")
-    
-    meta = result.get('meta', {})
-    output.append(f"Stocks Analyzed: {meta.get('total_stocks', 0)}")
+    output.append(f"Horizon: {result['inputs']['horizon']}")
+    output.append(f"Risk Level: {result['inputs']['risk_level']}")
+    output.append(f"Strategy: {result['inputs']['goal']}")
+    output.append(f"Stocks Analyzed: {result['meta']['total_stocks']}")
     output.append(f"Model Accuracy (5-day): 56.06%")
     output.append(f"Information Coefficient: 0.0816")
     
@@ -106,56 +85,19 @@ def main():
     """Generate and save recommendations"""
     
     print("Initializing recommendation engine...")
-    
-    try:
-        engine = EnhancedRecommendationEngine()
-    except Exception as e:
-        print(f"Error initializing engine: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Create empty recommendations file
-        with open('recommendations.txt', 'w') as f:
-            f.write("❌ Could not initialize recommendation engine.\n")
-            f.write(f"Error: {str(e)}\n")
-        return 1
+    engine = EnhancedRecommendationEngine()
     
     print("Generating recommendations...")
-    
-    try:
-        result = engine.recommend(
-            capital=10000,
-            horizon='1w',
-            risk_level='medium',
-            goal='max_sharpe',
-            num_positions=5
-        )
-    except Exception as e:
-        print(f"Error generating recommendations: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Create error file
-        with open('recommendations.txt', 'w') as f:
-            f.write("❌ Could not generate recommendations.\n")
-            f.write(f"Error: {str(e)}\n")
-        return 1
+    result = engine.recommend(
+        capital=10000,
+        horizon='1w',
+        risk_level='medium',
+        goal='max_sharpe',
+        num_positions=5
+    )
     
     print("Formatting output...")
-    
-    try:
-        formatted = format_recommendations(result)
-    except Exception as e:
-        print(f"Error formatting recommendations: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Create minimal file
-        with open('recommendations.txt', 'w') as f:
-            f.write("❌ Could not format recommendations.\n")
-            f.write(f"Error: {str(e)}\n")
-            f.write(f"\nRaw result: {result}\n")
-        return 1
+    formatted = format_recommendations(result)
     
     # Save to file
     with open('recommendations.txt', 'w') as f:
@@ -167,7 +109,7 @@ def main():
     print("\n" + formatted)
     
     # Return success/failure
-    return 0 if result.get('success', False) else 1
+    return 0 if result['success'] else 1
 
 
 if __name__ == "__main__":
