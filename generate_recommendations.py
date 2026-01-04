@@ -30,20 +30,20 @@ def format_recommendations(result):
     # Portfolio metrics
     output.append("\n📈 PORTFOLIO METRICS:")
     output.append("-"*60)
-metrics = result.get('portfolio_metrics', {})
-output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
-output.append(f"  Success Probability: {metrics.get('probability_profit', 0.0):.1%}")
-output.append(f"  Expected Return: {metrics.get('expected_return', 0.0):+.2%}")
-if 'expected_profit' in metrics:
-    output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
-output.append(f"  Sharpe Ratio: {metrics.get('sharpe_estimate', 0.0):.2f}")
-output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0.0):.2%}")
+    metrics = result.get('portfolio_metrics', {})
+    output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
+    output.append(f"  Success Probability: {metrics.get('probability_profit', 0.0):.1%}")
+    output.append(f"  Expected Return: {metrics.get('expected_return', 0.0):+.2%}")
+    if 'expected_profit' in metrics:
+        output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
+    output.append(f"  Sharpe Ratio: {metrics.get('sharpe_estimate', 0.0):.2f}")
+    output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0.0):.2%}")
     
     # Recommendations
     output.append("\n🎯 TOP RECOMMENDATIONS:")
     output.append("-"*60)
     
-    recommendations = result['recommendations']
+    recommendations = result.get('recommendations', [])
     
     if len(recommendations) == 0:
         output.append("\n⚠️  No recommendations today.")
@@ -52,10 +52,10 @@ output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0.0):.2%}")
         for i, rec in enumerate(recommendations, 1):
             output.append(f"\n{i}. {rec['ticker']} - {rec['company']}")
             output.append(f"   Price: ${rec['current_price']:.2f}")
-            output.append(f"   Shares: {rec['shares']:.2f}")
-            output.append(f"   Investment: ${rec['allocation']:,.2f} ({rec['weight']:.1%} of portfolio)")
-            output.append(f"   Expected Return: {rec['expected_return']:+.2%}")
-            output.append(f"   Risk Level: {rec['risk_score']:.2f}")
+            output.append(f"   Shares: {rec.get('shares', 0):.2f}")
+            output.append(f"   Investment: ${rec.get('allocation', 0):,.2f} ({rec.get('weight', 0):.1%} of portfolio)")
+            output.append(f"   Expected Return: {rec.get('expected_return', 0):+.2%}")
+            output.append(f"   Risk Level: {rec.get('risk_score', 0):.2f}")
             output.append(f"   Confidence: {rec.get('prediction_confidence', 0.5):.1%}")
     
     # Risk warning
@@ -75,9 +75,10 @@ output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0.0):.2%}")
     output.append(f"Horizon: {result['inputs']['horizon']}")
     output.append(f"Risk Level: {result['inputs']['risk_level']}")
     output.append(f"Strategy: {result['inputs']['goal']}")
-    output.append(f"Stocks Analyzed: {result['meta']['total_stocks']}")
-    output.append(f"Model Accuracy (5-day): 56.06%")
-    output.append(f"Information Coefficient: 0.0816")
+    output.append(f"Stocks Analyzed: {result.get('meta', {}).get('total_stocks', 0)}")
+    output.append(f"Model Accuracy (1-day): 53.13%")
+    output.append(f"Model Accuracy (5-day): 53.50%")
+    output.append(f"Information Coefficient: 0.0829")
     
     return "\n".join(output)
 
