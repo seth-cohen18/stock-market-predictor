@@ -1,0 +1,162 @@
+{
+  "horizon": 1,
+  "target_col": "target_1d",
+  "feature_cols": [
+    "return_1d",
+    "return_5d",
+    "return_10d",
+    "return_20d",
+    "return_60d",
+    "price_to_ma_5",
+    "price_to_ma_20",
+    "price_to_ma_60",
+    "price_to_ma_200",
+    "volatility_5d",
+    "volatility_10d",
+    "volatility_20d",
+    "volatility_60d",
+    "volume_ratio_5",
+    "volume_ratio_20",
+    "momentum_5",
+    "momentum_10",
+    "momentum_20",
+    "range_5d",
+    "range_20d",
+    "spy_return_1d",
+    "spy_return_5d",
+    "spy_return_20d",
+    "spy_volatility",
+    "spy_trend",
+    "beta",
+    "regime_bull",
+    "regime_bear",
+    "regime_sideways",
+    "sector_return_1d",
+    "sector_return_5d",
+    "sector_return_20d",
+    "vs_sector_1d",
+    "vs_sector_5d",
+    "vs_sector_20d",
+    "sector_momentum",
+    "sector_rank",
+    "within_sector_rank",
+    "dollar_volume_ma_20",
+    "spread_ma_20",
+    "volume_volatility",
+    "zscore_20",
+    "zscore_60",
+    "momentum_streak",
+    "returns_smoothness",
+    "sentiment_score",
+    "sentiment_magnitude"
+  ],
+  "train_metrics": {
+    "mse": 0.0005315169431713627,
+    "rmse": 0.023054651226409015,
+    "mae": 0.014594666895492199,
+    "r2": 0.009143584836481256,
+    "direction_accuracy": 0.5306643054413593,
+    "ic": 0.3052613817677685
+  },
+  "test_metrics": {
+    "mse": 0.0005533692786953833,
+    "rmse": 0.023523802385995836,
+    "mae": 0.015246601229072376,
+    "r2": 0.0008865054381099746,
+    "direction_accuracy": 0.5132955724662747,
+    "ic": 0.039685951307182804
+  },
+  "train_period": {
+    "start": "2017-01-03 00:00:00-05:00",
+    "end": "2025-01-02 00:00:00-05:00",
+    "samples": 379464
+  },
+  "test_period": {
+    "start": "2025-01-03 00:00:00-05:00",
+    "end": "2025-12-11 00:00:00-05:00",
+    "samples": 46256
+  },
+  "feature_importance": [
+    {
+      "feature": "spy_return_1d",
+      "importance": 4.59839503467083
+    },
+    {
+      "feature": "spy_volatility",
+      "importance": 4.348638907074928
+    },
+    {
+      "feature": "spy_trend",
+      "importance": 3.414965942502022
+    },
+    {
+      "feature": "spy_return_20d",
+      "importance": 1.857333943247795
+    },
+    {
+      "feature": "sector_return_5d",
+      "importance": 0.4105510115623474
+    },
+    {
+      "feature": "return_20d",
+      "importance": 0.3908580094575882
+    },
+    {
+      "feature": "price_to_ma_5",
+      "importance": 0.1924089938402176
+    },
+    {
+      "feature": "sector_momentum",
+      "importance": 0.0
+    },
+    {
+      "feature": "regime_sideways",
+      "importance": 0.0
+    },
+    {
+      "feature": "sector_return_1d",
+      "importance": 0.0
+    },
+    {
+      "feature": "sector_return_20d",
+      "importance": 0.0
+    },
+    {
+      "feature": "vs_sector_1d",
+      "importance": 0.0
+    },
+    {
+      "feature": "vs_sector_5d",
+      "importance": 0.0
+    },
+    {
+      "feature": "vs_sector_20d",
+      "importance": 0.0
+    },
+    {
+      "feature": "sector_rank",
+      "importance": 0.0
+    },
+    {
+      "feature": "regime_bull",
+      "importance": 0.0
+    },
+    {
+      "feature": "within_sector_rank",
+      "importance": 0.0
+    },
+    {
+      "feature": "dollar_volume_ma_20",
+      "importance": 0.0
+    },
+    {
+      "feature": "spread_ma_20",
+      "importance": 0.0
+    },
+    {
+      "feature": "volume_volatility",
+      "importance": 0.0
+    }
+  ],
+  "trained_at": "2025-12-14T01:59:29.763280"
+}
