@@ -30,14 +30,14 @@ def format_recommendations(result):
     # Portfolio metrics
     output.append("\n📈 PORTFOLIO METRICS:")
     output.append("-"*60)
-    metrics = result['portfolio_metrics']
-    output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
-    output.append(f"  Success Probability: {metrics['probability_profit']:.1%}")
-    output.append(f"  Expected Return: {metrics['expected_return']:+.2%}")
-    if 'expected_profit' in metrics:
-        output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
-    output.append(f"  Sharpe Ratio: {metrics['sharpe_estimate']:.2f}")
-    output.append(f"  Portfolio Risk: {metrics['portfolio_risk']:.2%}")
+metrics = result.get('portfolio_metrics', {})
+output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
+output.append(f"  Success Probability: {metrics.get('probability_profit', 0.0):.1%}")
+output.append(f"  Expected Return: {metrics.get('expected_return', 0.0):+.2%}")
+if 'expected_profit' in metrics:
+    output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
+output.append(f"  Sharpe Ratio: {metrics.get('sharpe_estimate', 0.0):.2f}")
+output.append(f"  Portfolio Risk: {metrics.get('portfolio_risk', 0.0):.2%}")
     
     # Recommendations
     output.append("\n🎯 TOP RECOMMENDATIONS:")
