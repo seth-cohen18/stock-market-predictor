@@ -34,7 +34,8 @@ def format_recommendations(result):
     output.append(f"  Capital: ${result['inputs']['capital']:,.2f}")
     output.append(f"  Success Probability: {metrics['probability_profit']:.1%}")
     output.append(f"  Expected Return: {metrics['expected_return']:+.2%}")
-    output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
+    if 'expected_profit' in metrics:
+        output.append(f"  Expected Profit: ${metrics['expected_profit']:+,.2f}")
     output.append(f"  Sharpe Ratio: {metrics['sharpe_estimate']:.2f}")
     output.append(f"  Portfolio Risk: {metrics['portfolio_risk']:.2%}")
     
