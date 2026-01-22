@@ -1,0 +1,1 @@
+date,ticker,horizon,predicted_return,actual_return,predicted_direction,actual_direction,correct,model_type,confidence
