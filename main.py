@@ -1,409 +1,124 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import timedelta, datetime
-from typing import List
+"""
+Main training pipeline for stock market predictor
+Runs the complete data → features → training workflow
+"""
+import sys
 import os
-from dotenv import load_dotenv
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from database import get_db, init_db, User, Portfolio, UserPreferences, DailyRecommendation, NewsArticle
-from auth import (
-    get_password_hash, 
-    verify_password, 
-    create_access_token, 
-    get_current_active_user,
-    ACCESS_TOKEN_EXPIRE_MINUTES
-)
-from pydantic import BaseModel, EmailStr
+import yaml
+import pandas as pd
+from pathlib import Path
 
-load_dotenv()
+def load_config(config_path='config.yaml'):
+    """Load configuration"""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
-# Initialize FastAPI app
-app = FastAPI(title="Stock Predictor API", version="1.0.0")
-
-# CORS middleware - MUST be before routes
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Initialize database on startup
-@app.on_event("startup")
-def startup_event():
-    init_db()
-
-
-# ============================================================================
-# PYDANTIC MODELS (Request/Response schemas)
-# ============================================================================
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: str
-    risk_profile: str = "medium"
-    capital: float = 10000.0
-
-
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    full_name: str
-    risk_profile: str
-    capital: float
-    created_at: datetime
+def main():
+    """Run the complete training pipeline"""
     
-    class Config:
-        from_attributes = True
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class PortfolioItem(BaseModel):
-    ticker: str
-    shares: float
-    avg_cost: float
-
-
-class PortfolioResponse(BaseModel):
-    id: int
-    ticker: str
-    shares: float
-    avg_cost: float
-    added_at: datetime
+    print("=" * 70)
+    print("STOCK MARKET PREDICTOR - TRAINING PIPELINE")
+    print("=" * 70)
     
-    class Config:
-        from_attributes = True
-
-
-class RecommendationResponse(BaseModel):
-    ticker: str
-    company_name: str
-    current_price: float
-    prediction_1d: float
-    prediction_5d: float
-    confidence: float
-    expected_return: float
-    risk_score: float
-    action: str
-    reasoning: dict
+    # Import modules
+    from fetch_prices import update_prices, fetch_all_prices, load_prices
+    from build_features import build_features, clean_features, get_feature_columns, save_features, load_features
+    from train import train_horizon_model
     
-    class Config:
-        from_attributes = True
-
-
-# ============================================================================
-# AUTH ENDPOINTS
-# ============================================================================
-
-@app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user"""
-    # Check if user exists
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    # Load config
+    config = load_config('config.yaml')
     
-    # Create new user
-    hashed_password = get_password_hash(user.password)
-    new_user = User(
-        email=user.email,
-        hashed_password=hashed_password,
-        full_name=user.full_name,
-        risk_profile=user.risk_profile,
-        capital=user.capital
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    # Step 1: Fetch/Update latest prices
+    print("\n📊 Step 1: Fetching latest market data...")
     
-    # Create default preferences
-    preferences = UserPreferences(user_id=new_user.id)
-    db.add(preferences)
-    db.commit()
+    prices_path = f"{config['data']['raw_dir']}/prices.parquet"
     
-    return new_user
-
-
-@app.post("/api/auth/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Login and get access token"""
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        # Check if prices file exists
+        if Path(prices_path).exists():
+            print("Updating existing price data...")
+            df_prices = update_prices(prices_path, config['data']['tickers'])
+        else:
+            print("Fetching fresh price data...")
+            # Get date range from config or use defaults
+            start_date = config.get('data', {}).get('start_date', '2019-01-01')
+            end_date = pd.Timestamp.now().strftime('%Y-%m-%d')
+            df_prices = fetch_all_prices(
+                tickers=config['data']['tickers'],
+                start_date=start_date,
+                end_date=end_date,
+                output_path=prices_path
+            )
+        print("✅ Market data updated")
+    except Exception as e:
+        print(f"⚠️  Error updating prices: {e}")
+        print("   Loading existing data...")
+        df_prices = load_prices(prices_path)
+    
+    # Step 2: Build features
+    print("\n🔧 Step 2: Building features...")
+    try:
+        # Build features (without news for speed)
+        df_features = build_features(df_prices, config, use_news=False)
+        
+        # Clean features
+        df_features = clean_features(df_features, config)
+        
+        # Save features
+        features_path = f"{config['data']['processed_dir']}/features.parquet"
+        save_features(df_features, features_path)
+        
+        print("✅ Features built")
+    except Exception as e:
+        print(f"❌ Error building features: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
+    # Step 3: Train models
+    print("\n🤖 Step 3: Training models...")
+    
+    # Load features
+    features_path = f"{config['data']['processed_dir']}/features.parquet"
+    df = load_features(features_path)
+    
+    # Get feature columns
+    feature_cols = get_feature_columns(df)
+    print(f"Number of features: {len(feature_cols)}")
+    
+    # Create models directory
+    model_dir = "models"
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # Train models for each horizon
+    results = {}
+    
+    for horizon in config['model']['horizons']:
+        print(f"\nTraining {horizon}-day model...")
+        result = train_horizon_model(
+            df=df,
+            horizon=horizon,
+            config=config,
+            feature_cols=feature_cols,
+            output_dir=model_dir
         )
+        results[f'{horizon}d'] = result
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-@app.get("/api/auth/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_active_user)):
-    """Get current user info"""
-    return current_user
-
-
-@app.put("/api/auth/me", response_model=UserResponse)
-def update_user(
-    risk_profile: str = None,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Update user settings"""
-    if risk_profile and risk_profile in ["conservative", "medium", "aggressive"]:
-        current_user.risk_profile = risk_profile
-        db.commit()
-        db.refresh(current_user)
+    # Summary
+    print("\n" + "=" * 70)
+    print("TRAINING SUMMARY")
+    print("=" * 70)
+    for horizon_name, result in results.items():
+        print(f"\n{horizon_name}:")
+        metrics = result['metrics']
+        print(f"  Direction Accuracy: {metrics['direction_accuracy']:.2%}")
+        print(f"  Information Coefficient: {metrics['ic']:.4f}")
+        print(f"  R²: {metrics['r2']:.4f}")
     
-    return current_user
-
-
-# ============================================================================
-# PORTFOLIO ENDPOINTS
-# ============================================================================
-
-@app.get("/api/portfolio", response_model=List[PortfolioResponse])
-def get_portfolio(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    """Get user's portfolio"""
-    portfolios = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).all()
-    return portfolios
-
-
-@app.post("/api/portfolio", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
-def add_to_portfolio(
-    item: PortfolioItem,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Add stock to portfolio"""
-    # Check if already exists
-    existing = db.query(Portfolio).filter(
-        Portfolio.user_id == current_user.id,
-        Portfolio.ticker == item.ticker.upper()
-    ).first()
-    
-    if existing:
-        # Update existing
-        existing.shares = item.shares
-        existing.avg_cost = item.avg_cost
-        existing.last_updated = datetime.utcnow()
-        db.commit()
-        db.refresh(existing)
-        return existing
-    else:
-        # Create new
-        new_item = Portfolio(
-            user_id=current_user.id,
-            ticker=item.ticker.upper(),
-            shares=item.shares,
-            avg_cost=item.avg_cost
-        )
-        db.add(new_item)
-        db.commit()
-        db.refresh(new_item)
-        return new_item
-
-
-@app.delete("/api/portfolio/{ticker}")
-def remove_from_portfolio(
-    ticker: str,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Remove stock from portfolio"""
-    item = db.query(Portfolio).filter(
-        Portfolio.user_id == current_user.id,
-        Portfolio.ticker == ticker.upper()
-    ).first()
-    
-    if not item:
-        raise HTTPException(status_code=404, detail="Stock not in portfolio")
-    
-    db.delete(item)
-    db.commit()
-    return {"message": f"Removed {ticker} from portfolio"}
-
-
-@app.get("/api/portfolio/value")
-def get_portfolio_value(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Calculate total portfolio value with current prices"""
-    import yfinance as yf
-    
-    portfolio_items = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).all()
-    
-    if not portfolio_items:
-        return {
-            "total_value": 0,
-            "total_cost": 0,
-            "total_gain": 0,
-            "total_gain_percent": 0,
-            "positions": []
-        }
-    
-    positions = []
-    total_value = 0
-    total_cost = 0
-    
-    for item in portfolio_items:
-        try:
-            # Fetch current price from yfinance
-            ticker = yf.Ticker(item.ticker)
-            current_price = ticker.info.get('currentPrice') or ticker.info.get('regularMarketPrice', 0)
-            
-            if current_price == 0:
-                # Fallback: try to get from history
-                hist = ticker.history(period='1d')
-                if not hist.empty:
-                    current_price = hist['Close'].iloc[-1]
-            
-            current_value = current_price * item.shares
-            cost_basis = item.avg_cost * item.shares
-            gain = current_value - cost_basis
-            gain_percent = (gain / cost_basis * 100) if cost_basis > 0 else 0
-            
-            positions.append({
-                "ticker": item.ticker,
-                "shares": item.shares,
-                "avg_cost": item.avg_cost,
-                "current_price": current_price,
-                "current_value": current_value,
-                "cost_basis": cost_basis,
-                "gain": gain,
-                "gain_percent": gain_percent
-            })
-            
-            total_value += current_value
-            total_cost += cost_basis
-            
-        except Exception as e:
-            print(f"Error fetching price for {item.ticker}: {e}")
-            # Use avg_cost as fallback
-            positions.append({
-                "ticker": item.ticker,
-                "shares": item.shares,
-                "avg_cost": item.avg_cost,
-                "current_price": item.avg_cost,
-                "current_value": item.avg_cost * item.shares,
-                "cost_basis": item.avg_cost * item.shares,
-                "gain": 0,
-                "gain_percent": 0
-            })
-            total_value += item.avg_cost * item.shares
-            total_cost += item.avg_cost * item.shares
-    
-    total_gain = total_value - total_cost
-    total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
-    
-    return {
-        "total_value": total_value,
-        "total_cost": total_cost,
-        "total_gain": total_gain,
-        "total_gain_percent": total_gain_percent,
-        "positions": positions
-    }
-
-
-# ============================================================================
-# RECOMMENDATIONS ENDPOINTS
-# ============================================================================
-
-@app.get("/api/recommendations", response_model=List[RecommendationResponse])
-def get_recommendations(
-    limit: int = 10,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get top recommendations for user based on risk profile"""
-    # Get latest recommendations
-    latest_date = db.query(DailyRecommendation.date).order_by(DailyRecommendation.date.desc()).first()
-    if not latest_date:
-        return []
-    
-    recommendations = db.query(DailyRecommendation).filter(
-        DailyRecommendation.date == latest_date[0]
-    ).order_by(DailyRecommendation.confidence.desc()).limit(limit).all()
-    
-    return recommendations
-
-
-@app.get("/api/recommendations/portfolio", response_model=List[RecommendationResponse])
-def get_portfolio_recommendations(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get recommendations for stocks in user's portfolio"""
-    # Get user's tickers
-    portfolio_tickers = db.query(Portfolio.ticker).filter(
-        Portfolio.user_id == current_user.id
-    ).all()
-    tickers = [t[0] for t in portfolio_tickers]
-    
-    if not tickers:
-        return []
-    
-    # Get latest recommendations for those tickers
-    latest_date = db.query(DailyRecommendation.date).order_by(DailyRecommendation.date.desc()).first()
-    if not latest_date:
-        return []
-    
-    recommendations = db.query(DailyRecommendation).filter(
-        DailyRecommendation.date == latest_date[0],
-        DailyRecommendation.ticker.in_(tickers)
-    ).all()
-    
-    return recommendations
-
-
-# ============================================================================
-# NEWS ENDPOINTS
-# ============================================================================
-
-@app.get("/api/news")
-def get_news(
-    ticker: str = None,
-    limit: int = 10,
-    db: Session = Depends(get_db)
-):
-    """Get news articles, optionally filtered by ticker"""
-    query = db.query(NewsArticle).order_by(NewsArticle.published_at.desc())
-    
-    if ticker:
-        query = query.filter(NewsArticle.ticker == ticker.upper())
-    
-    articles = query.limit(limit).all()
-    return articles
-
-
-# ============================================================================
-# HEALTH CHECK
-# ============================================================================
-
-@app.get("/")
-def root():
-    """API health check"""
-    return {
-        "status": "online",
-        "message": "Stock Predictor API",
-        "version": "1.0.0"
-    }
-
+    print("\n✅ Training pipeline complete!")
+    print("=" * 70)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    main()
